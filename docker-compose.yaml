@@ -1,0 +1,43 @@
+# DB가 이미 생성돼 있을경우 pdns-db 구문 및 하단의 volumes 삭제
+
+services:
+  pdns-db:
+    image: mariadb:10.11
+    container_name: pdns-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: pdns
+      MYSQL_USER: pdns
+      MYSQL_PASSWORD: pdns
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - pdns_db_data:/var/lib/mysql
+      - ./db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -prootpass --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  pdns:
+    image: powerdns/pdns-auth-48:4.8.4
+    container_name: pdns-server
+    restart: unless-stopped
+    depends_on:
+      pdns-db:
+        condition: service_healthy
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "8081:8081/tcp"
+    volumes:
+      - ./pdns.conf:/etc/powerdns/pdns.conf:ro
+
+volumes:
+  pdns_db_data:
